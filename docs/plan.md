@@ -138,6 +138,70 @@ should not pay for a JSON parser. What the stage taught:
 
 ### Z4 — a Jupyter kernel
 
+**Spiked 2026-10-22. Viable, and cheaper to reach than expected on one
+axis — but the payoff is smaller than this plan assumed.** Four findings,
+three of them from Zed's source rather than from trying things.
+
+**1. The kernelspec hook is official, not an accident.** Zed matches a
+kernelspec to a buffer with `Language::matches_kernel_language`, which
+accepts the language's `code_fence_block_name`, its `name` lowercased, or
+any entry in **`kernel_language_names`** — a `config.toml` field whose
+docstring in `language_config.rs` says exactly this:
+
+> *Alternative language names that Jupyter kernels may report for this
+> language. Used when a kernel's `language` field differs from Zed's
+> language name. For example, the Nu extension would set this to
+> `["nushell"]`.*
+
+So `kernel_language_names = ["scheme", "scm"]` here plus
+`"language": "scheme"` in the kernelspec, and the picker finds it. The
+earlier plan rested on a third-party report that an OCaml kernel worked;
+it does not need to. A user can also pin one with `jupyter.kernel_selections`.
+
+**2. The message mapping is as close to one-for-one as it looked.**
+`execute_request`→`eval`, `complete_request`→`complete`,
+`inspect_request`→`describe`, and `is_complete_request`→`parse` exactly —
+Jupyter and scm's REPL ask the same question in the same words.
+
+**3. Output does not stream, and this is what shrinks the prize.**
+Measured against a live server: a form that `display`s, spins for two
+seconds, then `display`s again and returns, sends **nothing for 2.00s** and
+then everything at once —
+
+    first bytes after 2.00s; complete after 2.00s
+    (:id 1 :status ok :value "42" :output "FIRSTSECOND")
+
+because `:output` travels with the answer (`scm/docs/repl.md`). A kernel
+can only emit its `stream` messages after execution finishes. So inline
+results would appear *when a form completes*, which for the long
+operations this project cares about — a render — is no better than the
+task pane Z2 already has. The win is confined to short forms.
+
+Fixing it is not part of Z4: it needs an unsolicited `:output` message
+pushed while an evaluation is still running, which means a second,
+asynchronous path out of the session and contradicts "`Session::handle` is
+the only door". That is a protocol stage of its own, and it would improve
+Z2, `scm-mode.el` and `ray-scm` at the same time — which is an argument for
+doing *it* rather than Z4.
+
+**4. A trap to build against: Zed hangs on a kernel that does not bind the
+stdin socket.** `zed#56918` — IHaskell works under `jupyter console` and
+hangs Zed for ever on "Connecting to kernel…". Closed by a staleness bot
+rather than fixed, so it stands.
+
+**Cost, and the recommendation.** A Rust kernel means ZeroMQ, HMAC-SHA256
+and the v5 message framing — several dependencies for a project whose
+whole character is not having them. A Python `ipykernel` shim forwarding to
+`scm --serve` is maybe 80 lines and no Rust dependencies, but puts a Python
+runtime between the editor and a Rust language.
+
+Given finding 3, **Z4 is deferred**: its remaining value over Z2 is
+cosmetic placement of short-form results, and Z5 gives something that does
+not exist at all today. If the inline feel is wanted before paying for a
+Rust kernel, the Python shim is the trial, and it is throwaway by design.
+
+### Z4 — a Jupyter kernel (original sketch)
+
 Zed's REPL runs any kernel it finds through Jupyter's kernelspec system, so
 this needs no extension at all: a `kernel.json` under
 `~/Library/Jupyter/kernels/scm/` and `repl: refresh kernelspecs`. The
