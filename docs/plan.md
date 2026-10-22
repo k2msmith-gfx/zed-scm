@@ -82,7 +82,13 @@ Not Z4 — see its section for the measurement. Three candidates, best first:
    file's top-level definitions, so a `let` binding is not offered. The
    same limit the REPL has, and fixing it in `scm-lsp` would need the
    token scan to track binding forms.
-3. **Multi-dialect highlighting.** The grammar ships
+3. **SBCL** — the same arc for an external Lisp, scoped in
+   [sbcl-plan.md](sbcl-plan.md). Proposed, nothing built. The shape
+   inverts: SBCL is not modified and does not need to be, because a CL
+   image is extended by loading code, and the measured finding is that the
+   whole 20% of SLIME that is wanted is reachable from a loaded file with
+   no Swank at all.
+4. **Multi-dialect highlighting.** The grammar ships
    `dialects/{r5rs,r6rs,r7rs,chez,guile,chicken}`, so other Schemes are one
    `languages/` directory each. A different product, not a tweak — this one
    is deliberately scm-flavoured, which is its value over
