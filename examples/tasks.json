@@ -1,0 +1,59 @@
+// Zed tasks for scm. Copy into `~/.config/zed/tasks.json` (every project) or
+// `.zed/tasks.json` (one project), and adjust the path to `scm-eval` and the
+// address if 7000 is taken.
+//
+// Z2's premise: Zed extensions cannot add a command, a keybinding or a
+// panel, so the editor's half of a SLIME-style loop is a task. The server
+// owns the session; the REPL tab and every eval below are clients of it, so
+// a procedure defined from the buffer is callable at the prompt.
+[
+  {
+    // Start this first, and leave the tab open: it is also where a script's
+    // own output goes. One server per project is the intended shape.
+    "label": "scm: serve",
+    "command": "scm --serve 127.0.0.1:7000",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    // The REPL window. C-d leaves the prompt; the server keeps running.
+    "label": "scm: REPL",
+    "command": "scm --connect 127.0.0.1:7000",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    "label": "scm: eval selection",
+    "command": "printf '%s\\n' \"$ZED_SELECTED_TEXT\" | ~/devel/zed-scm/bin/scm-eval region",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    // The closest thing to C-M-x. $ZED_ROW is the cursor's line; scm-eval
+    // takes the top-level form containing it.
+    "label": "scm: eval top-level form",
+    "command": "~/devel/zed-scm/bin/scm-eval defun \"$ZED_FILE\" \"$ZED_ROW\"",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    "label": "scm: eval buffer",
+    "command": "~/devel/zed-scm/bin/scm-eval buffer \"$ZED_FILE\"",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    // Out of band on a second connection, so it reaches a server that is
+    // busy with the form it is stopping.
+    "label": "scm: interrupt",
+    "command": "~/devel/zed-scm/bin/scm-eval interrupt",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "never"
+  }
+]

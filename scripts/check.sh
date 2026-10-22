@@ -52,8 +52,11 @@ known_gap() { case "$(basename "$1")" in srfi/4.scm|4.scm) return 0;; *) return 
 for f in "${sources[@]}"; do
   n=$($TS parse "$f" 2>&1 | grep -c 'ERROR\|MISSING' || true)
   if known_gap "$f"; then
-    [ "$n" -gt 0 ] && note "known gap: $n parse error(s) in $(basename "$f")" \
-      || bad "$(basename "$f") now parses; drop it from known_gap in $0"
+    if [ "$n" -gt 0 ]; then
+      note "known gap: $n parse error(s) in $(basename "$f")"
+    else
+      bad "$(basename "$f") now parses; drop it from known_gap in $0"
+    fi
   else
     [ "$n" -eq 0 ] || bad "$n parse error(s) in $f"
   fi
@@ -94,4 +97,9 @@ if [ -x "$SCM" ]; then
   SCM="$SCM" "$root/scripts/gen-builtins.sh" --check || fail=1
 fi
 
-[ "$fail" -eq 0 ] && note "all checks passed" || { note "checks failed"; exit 1; }
+if [ "$fail" -eq 0 ]; then
+  note "all checks passed"
+else
+  note "checks failed"
+  exit 1
+fi

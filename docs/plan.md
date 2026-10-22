@@ -26,7 +26,7 @@ several; this is another one.
 | stage | what | where the work is | status |
 |---|---|---|---|
 | **Z1** | highlighting, brackets, indents, outline, text objects | this repo, queries only | **DONE** |
-| Z2 | `scm --connect ADDR` + Zed tasks: a REPL in a terminal window, and eval of region / buffer / top-level form sharing one session | scm (`scm-cli`), plus `tasks.json` here | next |
+| **Z2** | `scm --connect ADDR` + Zed tasks: a REPL in a terminal window, and eval of region / buffer / top-level form sharing one session | scm (`scm-cli`), plus `tasks.json` here | **DONE** |
 | Z3 | `scm --lsp`: completion, hover, signature help, diagnostics, document symbols, goto-definition | scm (new `scm-lsp`), ~20 lines here | |
 | Z4 | a Jupyter kernel, for results inline in the buffer rather than in a terminal | a kernel crate or shim, nothing here | |
 | Z5 | a debug adapter over the break REPL: frames, locals, `,return` | scm, plus `debuggers` in `config.toml` | |
@@ -70,6 +70,29 @@ task variables give a row, a column and a selection, not a cursor-aware
 parse. What does survive, and is arguably better placed: pass `$ZED_FILE`
 and `$ZED_ROW` and let **scm** find the enclosing top-level form. It has a
 reader with locations; the editor does not need an AST.
+
+**Z2 is done (2026-10-22).** It landed as scm's **S22** — `scm --connect`,
+`Request::to_wire`, `Response::parse` — plus `bin/scm-eval` and
+`examples/{tasks,keymap}.json` here. What the stage actually taught:
+
+- **The interrupt was the only hard part.** A remote prompt's VM is in
+  another process, so the SIGINT handler's flag was the wrong one. It now
+  writes `:op interrupt` to a second connection with `write(2)`, which is
+  async-signal-safe, from a descriptor stored at connect time; the text is
+  a constant because a handler must not allocate. Tested with a real signal
+  to a real client, not a mock.
+- **The protocol was half-built and nobody had noticed**, because the only
+  Rust consumer was the server. `Request::to_wire` and `Response::parse`
+  did not exist, so this client would have formatted its own text — the
+  divergence scm's §8 was written to prevent.
+- **`C-x C-e` does not survive**, as predicted. `$ZED_ROW` plus a column-0
+  heuristic in `scm-eval defun` covers `C-M-x`, which is the key that gets
+  used.
+- **Presentation is the client's job.** The prompt's banner and `scm> ` are
+  right for a terminal and noise in a task pane, so `scm-eval` strips them
+  rather than scm growing a `--quiet`. It also echoes the name a `define`
+  bound, because "I evaluated this" is answered by the name, not by
+  `#<unspecified>` — which is what `scm-mode.el` had already concluded.
 
 ### Z3 — `scm --lsp`
 

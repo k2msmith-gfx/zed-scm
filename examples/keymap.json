@@ -1,0 +1,15 @@
+// Keys for the tasks in tasks.json, in scm buffers only. Copy into
+// `~/.config/zed/keymap.json`. The spellings are scm-mode.el's, so the
+// muscle memory carries over; `ctrl-c ctrl-c` is a chord, not two bindings.
+[
+  {
+    "context": "Editor && extension == scm",
+    "bindings": {
+      "ctrl-c ctrl-c": ["task::Spawn", { "task_name": "scm: eval top-level form" }],
+      "ctrl-c ctrl-r": ["task::Spawn", { "task_name": "scm: eval selection" }],
+      "ctrl-c ctrl-k": ["task::Spawn", { "task_name": "scm: eval buffer" }],
+      "ctrl-c ctrl-z": ["task::Spawn", { "task_name": "scm: REPL" }],
+      "ctrl-c ctrl-b": ["task::Spawn", { "task_name": "scm: interrupt" }]
+    }
+  }
+]

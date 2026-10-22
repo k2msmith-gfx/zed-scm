@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Send code to a running `scm --serve`, for Zed's tasks to call.
+#
+# Zed has no API for "evaluate this form", so the editor's half of a
+# SLIME-style loop is a task, and a task is a shell command. This is that
+# command. It goes through `scm --connect`, which means the prompt a user
+# types at and the forms sent from a buffer land in **one** session: define
+# a procedure from the buffer, call it at the prompt.
+#
+#   scm-eval region            # the code on stdin ($ZED_SELECTED_TEXT)
+#   scm-eval buffer FILE       # (load FILE), so a backtrace names the file
+#   scm-eval defun FILE ROW    # the top-level form containing line ROW
+#   scm-eval interrupt         # stop a runaway, out of band
+#
+# SCM_ADDR, or 127.0.0.1:7000, is the server. SCM is the binary.
+set -uo pipefail
+ADDR="${SCM_ADDR:-127.0.0.1:7000}"
+SCM="${SCM:-scm}"
+
+usage() { sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+
+# The prompt's furniture -- the banner, `scm> `, the `...  ` continuation --
+# is for a person at a terminal. In a task pane it is noise around the one
+# line that matters. Stripped here rather than behind a flag on `scm`,
+# because how a client presents an answer is the client's business, and the
+# prompt's own behaviour is already tested as it stands.
+#
+# The substitutions are global, not anchored, because the prompt writes
+# without a trailing newline: a value lands glued to the next prompt on one
+# line. The cost is that a *string* containing "scm> " loses it, which is
+# the right trade for a pane that otherwise shows `...  ...  scm>` and
+# nothing else.
+present() {
+    sed -e '/^scm [0-9][^ ]* on /d' -e '/ globals\. /d' \
+        -e 's/scm> //g' -e 's/\.\.\.  //g' \
+    | awk 'NF { print }'
+}
+
+# What a `define` bound, so a definition echoes its name instead of the
+# nothing an unspecified value prints. `scm-mode.el` does the same thing and
+# for the same reason: the useful answer to "I evaluated this" is the name.
+defined_name() {
+    sed -n '1,3s/^[[:space:]]*(define\(-record-type\|-syntax\|-values\)\{0,1\}[[:space:]]*(*[[:space:]]*\([^][ ()]\{1,\}\).*/\2/p' \
+    | head -1
+}
+
+# Send CODE; print the value, or the name it defined, or say it was quiet.
+send() {
+    local code="$1" said
+    said=$(printf '%s\n' "$code" | "$SCM" --connect "$ADDR" 2>&1 | present)
+    if [ -n "$said" ]; then
+        printf '%s\n' "$said"
+    else
+        local name
+        name=$(printf '%s\n' "$code" | defined_name)
+        if [ -n "$name" ]; then printf '%s\n' "$name"; else printf '; no value\n'; fi
+    fi
+}
+
+# The top-level form containing a line, found the way `beginning-of-defun`
+# finds it: a top-level form starts in column 0. It is a heuristic, and it
+# is the same heuristic the indentation already shows the user, which
+# matters more here than being right about a form indented for a reason.
+defun_at() {
+    awk -v row="$2" '
+        /^[([]/ {
+            if (NR <= row) { start = NR; buf = "" }
+            else if (start) { done = 1 }
+        }
+        { if (start && !done) buf = buf $0 "\n" }
+        END { if (buf == "") exit 1; printf "%s", buf }
+    ' "$1"
+}
+
+case "${1:-}" in
+    region) send "$(cat)" ;;
+    interrupt)
+        # A second connection, which is the whole design: the interpreter is
+        # single-threaded, so an interrupt sent down a connection that is
+        # waiting on an evaluation would queue behind the form it is meant
+        # to stop. bash's /dev/tcp rather than `nc`, which is three
+        # different programs across the machines this runs on.
+        host=${ADDR%:*}; port=${ADDR##*:}
+        # Probed in a subshell first: a failing `exec` redirection prints
+        # bash's own complaint before this script can say anything useful,
+        # and `2>/dev/null` on the exec does not suppress it.
+        ( : >"/dev/tcp/$host/$port" ) 2>/dev/null \
+            || { echo "scm-eval: nothing listening on $ADDR" >&2; exit 1; }
+        exec 3<>"/dev/tcp/$host/$port"
+        printf '(:op interrupt :id 0)\n' >&3
+        exec 3<&-
+        echo "; interrupt sent to $ADDR" ;;
+    buffer)
+        [ $# -ge 2 ] || usage
+        # `load` rather than the text, so a backtrace names the file and a
+        # line a reader can click, not `<repl:3>`.
+        send "$(printf '(load "%s")' "$2")" ;;
+    defun)
+        [ $# -ge 3 ] || usage
+        form=$(defun_at "$2" "$3") \
+            || { echo "scm-eval: no top-level form at $2:$3" >&2; exit 1; }
+        send "$form" ;;
+    *) usage ;;
+esac
