@@ -28,8 +28,8 @@ several; this is another one.
 | **Z1** | highlighting, brackets, indents, outline, text objects | this repo, queries only | **DONE** |
 | **Z2** | `scm --connect ADDR` + Zed tasks: a REPL in a terminal window, and eval of region / buffer / top-level form sharing one session | scm (`scm-cli`), plus `tasks.json` here | **DONE** |
 | **Z3** | `scm-lsp`: completion, hover, signature help, diagnostics, document symbols, goto-definition | scm (new `scm-lsp` crate), ~40 lines here | **DONE** |
-| Z4 | a Jupyter kernel, for results inline in the buffer rather than in a terminal | a kernel crate or shim, nothing here | |
-| Z5 | a debug adapter over the break REPL: frames, locals, `,return` | scm, plus `debuggers` in `config.toml` | |
+| Z4 | a Jupyter kernel, for results inline in the buffer rather than in a terminal | a kernel crate or shim, nothing here | **spiked, deferred** |
+| **Z5** | a debug adapter over the break REPL: frames, locals, `,return` | scm (new `scm-dap` crate), plus `debuggers` + a schema here | **DONE** |
 
 ### Z1 — highlighting (done)
 
@@ -229,6 +229,24 @@ onto DAP's `stackTrace`, `scopes`, `variables` and `evaluate` unusually
 well, and Zed supports debug-adapter extensions with a `debuggers` entry in
 `config.toml`. It would give frame inspection with a real UI, which the
 Emacs client does not have. Last, because Z2–Z4 may remove the appetite.
+
+**Z5 is done (2026-10-22).** scm's **S24**: a `scm-dap` crate, plus
+`debug_adapter_schemas/scm.json`, a `[debug_adapters.scm]` entry and three
+`dap_*` methods here. What the stage taught:
+
+- **A tail call leaves no frame, and a debugger is where that becomes
+  visible.** Three nested calls all in tail position stop with one frame
+  and the outer binding is genuinely gone. §5 working correctly, now a
+  test — because the test beside it had assumed otherwise, which is what a
+  user will assume too.
+- **What it refuses matters as much as what it does.** No breakpoints, no
+  stepping, no attach, each for a structural reason, each refused with a
+  message rather than accepted and ignored.
+- **The obvious threading deadlocks.** The handler cannot have its own
+  reply channel, because the thread that would drain it is blocked inside
+  the evaluation the handler is describing.
+- **This is the one piece that is not a client of `--serve`**: a break
+  handler must be inside the process that owns the `Vm`.
 
 ## What Zed cannot be made to do
 

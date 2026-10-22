@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "scm debug configuration",
+  "description": "Run a Scheme program under scm-dap. There are no breakpoints: execution stops at an uncaught error, with the frames live.",
+  "type": "object",
+  "required": ["program"],
+  "properties": {
+    "program": {
+      "type": "string",
+      "description": "Path of the .scm file to run."
+    },
+    "request": {
+      "type": "string",
+      "enum": ["launch"],
+      "default": "launch",
+      "description": "Only launch: there is no process to attach to."
+    },
+    "cwd": {
+      "type": "string",
+      "description": "Working directory for the program."
+    }
+  }
+}

@@ -1,7 +1,7 @@
 id = "scm"
 name = "scm Scheme"
 description = "Editing support for scm, an embeddable R7RS-small Scheme in Rust."
-version = "0.2.0"
+version = "0.3.0"
 schema_version = 1
 authors = ["Kevin Smith <k2msmith@gmail.com>"]
 repository = "https://github.com/k2msmith-gfx/zed-scm"
@@ -13,6 +13,13 @@ repository = "https://github.com/k2msmith-gfx/zed-scm"
 [language_servers.scm-lsp]
 name = "scm-lsp"
 languages = ["scm Scheme"]
+
+# The break REPL with a UI: stops at an uncaught error with the frames live,
+# and the Debug Console takes the same `,return EXPR` and `,abort` the
+# terminal prompt takes. No breakpoints and no stepping -- the VM has no hook
+# for either, and the adapter says so rather than ignoring them.
+[debug_adapters.scm]
+schema_path = "debug_adapter_schemas/scm.json"
 
 # The default parser of 6cdh/tree-sitter-scheme, which accepts the union of
 # R5RS, R6RS and R7RS reader syntax, `[]` lists and `#:` keywords. Pinned

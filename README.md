@@ -4,8 +4,9 @@
 embeddable R7RS-small Scheme in Rust, with the editing support its Emacs
 client already has.
 
-**Z1–Z3 are done**: highlighting, a REPL window with SLIME-style
-evaluation, and a language server. The staging and what is left is in
+**Z1–Z3 and Z5 are done**: highlighting, a REPL window with SLIME-style
+evaluation, a language server, and a debugger. Z4 (a Jupyter kernel) was
+spiked and deferred — [docs/plan.md](docs/plan.md) says why. The staging and what is left is in
 [docs/plan.md](docs/plan.md). Most of the work lands in scm rather than
 here, because Zed extensions cannot add commands, keybindings or panels and
 cannot answer a completion request — they can only name a program to
@@ -119,6 +120,40 @@ a scene's side effects on every keystroke.
 Not there: rename, references, formatting, and scoped completion (a `let`
 binding is not offered — the same limit the REPL has). Go-to-definition
 stays inside the file, because a prelude name is a value and not a line.
+
+## Z5: the debugger
+
+From `scm-dap` in the scm repository
+([`docs/dap.md`](https://github.com/k2msmith-gfx/scm/blob/main/docs/dap.md)):
+
+```
+cd ~/devel/scm && cargo install --path scm-dap
+```
+
+Then pick **scm** in the debugger's New Process modal, or write a
+`.zed/debug.json`:
+
+```json
+[{ "label": "run this file", "adapter": "scm", "program": "$ZED_FILE" }]
+```
+
+It is the break REPL with a UI: an uncaught error stops with the frames
+live, and you get the stack, each frame's locals, and a console that
+evaluates **in the selected frame's environment**. `scm-mode.el` has none
+of this.
+
+| in the Debug Console | what happens |
+|---|---|
+| any expression | evaluated in the selected frame |
+| `,return EXPR` | the failed expression produces `EXPR` and the program **carries on** |
+| `,abort` (or Continue) | unwind as if there had been no handler |
+
+**Two things to know before you reach for it.** There are no breakpoints
+and no stepping — the VM has no hook for either, so the adapter refuses
+them with a reason instead of accepting and ignoring. And **a tail call
+leaves no frame**, so a chain of tail calls stops with one frame and the
+outer bindings are genuinely gone. That is correct Scheme, not a broken
+debugger; make a call non-tail and the frames reappear.
 
 ## Install
 

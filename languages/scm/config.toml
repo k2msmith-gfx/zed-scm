@@ -8,6 +8,9 @@ tab_size = 2
 hard_tabs = false
 autoclose_before = ")]"
 
+# Offered in the debugger's New Process modal for a .scm buffer.
+debuggers = ["scm"]
+
 # `:` and `&` are word characters because `:at` and `&opt` are single tokens
 # in scm and a double-click should take the whole thing. The rest is the
 # R7RS identifier set minus the characters a delimiter already breaks on.
