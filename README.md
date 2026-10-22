@@ -166,6 +166,9 @@ debugger; make a call non-tail and the frames reappear.
 
 ## Install
 
+**[INSTALL.md](INSTALL.md) is the full set of steps**, with a check after
+each one and a troubleshooting section. The short version follows.
+
 Not on the extension registry yet. Clone it and use Zed's
 `zed: install dev extension`:
 

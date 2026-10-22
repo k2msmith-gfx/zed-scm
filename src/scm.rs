@@ -29,6 +29,20 @@ impl zed::Extension for ScmExtension {
         _language_server_id: &LanguageServerId,
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
+        // An explicit path in settings.json wins, because PATH is not
+        // always the answer: on a Nix-managed machine `cargo install`
+        // writes to `~/.cargo/bin`, which may be on no PATH at all -- and
+        // the error below promises this setting works, so it has to.
+        let configured = zed::settings::LspSettings::for_worktree("scm-lsp", worktree)
+            .ok()
+            .and_then(|s| s.binary);
+        if let Some(path) = configured.as_ref().and_then(|b| b.path.clone()) {
+            return Ok(zed::Command {
+                command: path,
+                args: configured.and_then(|b| b.arguments).unwrap_or_default(),
+                env: Default::default(),
+            });
+        }
         let command = worktree.which("scm-lsp").ok_or_else(|| {
             // A missing binary is the one failure a user will actually hit,
             // so the message says what to run rather than what went wrong.
