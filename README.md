@@ -4,10 +4,12 @@
 embeddable R7RS-small Scheme in Rust, with the editing support its Emacs
 client already has.
 
-**Z1 (highlighting) and Z2 (a REPL window and SLIME-style evaluation) are
-done.** Completion is Z3 and needs an LSP server; the staging is in
+**Z1–Z3 are done**: highlighting, a REPL window with SLIME-style
+evaluation, and a language server. The staging and what is left is in
 [docs/plan.md](docs/plan.md). Most of the work lands in scm rather than
-here, because Zed extensions cannot add commands, keybindings or panels.
+here, because Zed extensions cannot add commands, keybindings or panels and
+cannot answer a completion request — they can only name a program to
+launch.
 
 ## What Z1 does
 
@@ -75,6 +77,49 @@ Then `scm: serve` once, and the keys work.
 one that starts in column 0. A form indented for some reason is not found,
 which is the same thing the indentation already told you.
 
+## Z3: completion, hover, signature help, diagnostics, outline
+
+From `scm-lsp` in the scm repository (its record is
+[`docs/lsp.md`](https://github.com/k2msmith-gfx/scm/blob/main/docs/lsp.md)).
+Build it once:
+
+```
+cd ~/devel/scm && cargo install --path scm-lsp
+```
+
+Zed starts it for `.scm` and `.sld` buffers. There is nothing to configure
+if you use port 7000, which is `scm-eval`'s default too — one
+`scm --serve` then serves the editor, the prompt and the language server.
+For another port:
+
+```json
+{ "lsp": { "scm-lsp": { "initialization_options": { "address": "127.0.0.1:7001" } } } }
+```
+
+**What makes it worth having over a parse-the-file server:** names come
+from the **running session**. Define a procedure at the REPL tab and the
+editor completes it immediately, with its signature and docstring on
+hover — including an accessor a macro generated, which no reading of the
+text could find. With no server running it falls back to a session of its
+own, so a cold buffer still completes over the prelude; the handshake says
+which it got.
+
+It never evaluates anything. Only `complete`, `describe` and `ping` go over
+the wire, because an editor that evaluated a buffer to analyse it would run
+a scene's side effects on every keystroke.
+
+| feature | source |
+|---|---|
+| completion | the live session, plus the file's own definitions sorted first |
+| hover | `describe` — signature, kind, docstring, current value |
+| signature help | `(signature …)`'s own text, with the argument the cursor is in |
+| diagnostics | scm's reader: **invalid** is an error, **incomplete** is not |
+| outline, go-to-definition | a token scan, so it survives a half-typed form |
+
+Not there: rename, references, formatting, and scoped completion (a `let`
+binding is not offered — the same limit the REPL has). Go-to-definition
+stays inside the file, because a prelude name is a value and not a line.
+
 ## Install
 
 Not on the extension registry yet. Clone it and use Zed's
@@ -85,7 +130,8 @@ git clone https://github.com/k2msmith-gfx/zed-scm ~/devel/zed-scm
 ```
 
 Then `cmd-shift-p` → `zed: install dev extension` → pick `~/devel/zed-scm`.
-Zed compiles the grammar itself; nothing else is needed.
+Zed compiles the grammar and the extension's wasm itself. For the language
+server, `cargo install --path scm-lsp` in the scm repository as above.
 
 ### It collides with the Scheme extension
 

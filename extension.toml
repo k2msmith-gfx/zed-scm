@@ -1,10 +1,18 @@
 id = "scm"
 name = "scm Scheme"
 description = "Editing support for scm, an embeddable R7RS-small Scheme in Rust."
-version = "0.1.0"
+version = "0.2.0"
 schema_version = 1
 authors = ["Kevin Smith <k2msmith@gmail.com>"]
 repository = "https://github.com/k2msmith-gfx/zed-scm"
+
+# Completion, hover, signature help, diagnostics and the outline, from
+# `scm-lsp` in the scm repository. It is a client of a running `scm --serve`,
+# so what it completes is the session the user is working in. `languages`
+# rather than the older `language`, which Zed's manifest marks deprecated.
+[language_servers.scm-lsp]
+name = "scm-lsp"
+languages = ["scm Scheme"]
 
 # The default parser of 6cdh/tree-sitter-scheme, which accepts the union of
 # R5RS, R6RS and R7RS reader syntax, `[]` lists and `#:` keywords. Pinned

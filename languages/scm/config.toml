@@ -1,6 +1,8 @@
 name = "scm Scheme"
 grammar = "scheme"
-path_suffixes = ["scm"]
+# `.sld` is R7RS's library suffix and scm has 37 of them; same reader, same
+# queries. `.ss` is left to the Scheme extension, which claims it.
+path_suffixes = ["scm", "sld"]
 line_comments = ["; ", ";; "]
 tab_size = 2
 hard_tabs = false

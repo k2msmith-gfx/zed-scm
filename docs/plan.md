@@ -27,7 +27,7 @@ several; this is another one.
 |---|---|---|---|
 | **Z1** | highlighting, brackets, indents, outline, text objects | this repo, queries only | **DONE** |
 | **Z2** | `scm --connect ADDR` + Zed tasks: a REPL in a terminal window, and eval of region / buffer / top-level form sharing one session | scm (`scm-cli`), plus `tasks.json` here | **DONE** |
-| Z3 | `scm --lsp`: completion, hover, signature help, diagnostics, document symbols, goto-definition | scm (new `scm-lsp`), ~20 lines here | |
+| **Z3** | `scm-lsp`: completion, hover, signature help, diagnostics, document symbols, goto-definition | scm (new `scm-lsp` crate), ~40 lines here | **DONE** |
 | Z4 | a Jupyter kernel, for results inline in the buffer rather than in a terminal | a kernel crate or shim, nothing here | |
 | Z5 | a debug adapter over the break REPL: frames, locals, `,return` | scm, plus `debuggers` in `config.toml` | |
 
@@ -94,7 +94,7 @@ reader with locations; the editor does not need an AST.
   bound, because "I evaluated this" is answered by the name, not by
   `#<unspecified>` — which is what `scm-mode.el` had already concluded.
 
-### Z3 — `scm --lsp`
+### Z3 — `scm-lsp`
 
 Completion in Zed means LSP, because the extension cannot answer a
 completion request itself — `language_server_command` returns an argv and
@@ -111,6 +111,30 @@ close to mechanical:
 That is `scm-describe-symbol` and `scm-eldoc-function` from the Emacs
 client, arriving as hover and signature help. It is an adapter over
 `Session`, not new semantics, and it is the stage with real size.
+
+**Z3 is done (2026-10-22).** scm's **S23**: a `scm-lsp` crate, plus
+`src/scm.rs` and a `[language_servers.scm-lsp]` entry here. It is a
+separate binary, not `scm-lsp` as this plan first said: the `scm` binary
+has a 10 ms boot budget with a test enforcing it, and a `--batch` sweep
+should not pay for a JSON parser. What the stage taught:
+
+- **It needed no new scm API.** `Interp::complete` and `describe` already
+  answered completion and hover, `ReadError::Invalid{span,msg}` gave
+  diagnostics a position, and S22 had already built the client half of the
+  protocol. Unlike Z2, the `scm` crate was not touched at all.
+- **The live session is the whole value.** A parse-the-file server would
+  not know the procedure defined at the prompt, the accessor a macro
+  generated, or a docstring as the value carries it. The test that matters
+  defines something at a prompt and watches the editor complete it.
+- **Structure must not come from the reader.** A buffer being edited is
+  unparseable most of the time, so the outline comes from a token scan that
+  cannot fail. Three lexer cases each cost a test because getting them
+  wrong unbalances the rest of the file *silently*: `#\(` is a character,
+  `#|` nests, and `'`/`#;` prefix without nesting.
+- **Three coordinate systems meet in an LSP** and none is the others:
+  scm's spans are char offsets, LSP positions are UTF-16 code units, and
+  `Content-Length` is bytes. The test uses an emoji next to a `λ`, since
+  one is two units and the other is one.
 
 ### Z4 — a Jupyter kernel
 

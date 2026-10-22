@@ -39,7 +39,7 @@ sources=("$root"/test/*.scm)
 if [ -x "$SCM" ]; then
   scmrepo=$(cd "$(dirname "$SCM")/../.." && pwd)
   while IFS= read -r f; do sources+=("$f"); done < <(
-    find "$scmrepo" -name '*.scm' -not -path '*/target/*' \
+    find "$scmrepo" \( -name '*.scm' -o -name '*.sld' \) -not -path '*/target/*' \
       -not -name 'r7rs-tests.scm' 2>/dev/null)
 else
   note "no scm at $SCM; checking only test/*.scm"

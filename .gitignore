@@ -1,3 +1,4 @@
 .check-highlights.txt
 *.wasm
 grammars/
+target/
