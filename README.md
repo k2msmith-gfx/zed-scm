@@ -116,10 +116,14 @@ a scene's side effects on every keystroke.
 | signature help | `(signature …)`'s own text, with the argument the cursor is in |
 | diagnostics | scm's reader: **invalid** is an error, **incomplete** is not |
 | outline, go-to-definition | a token scan, so it survives a half-typed form |
+| **go-to-definition across the workspace** | an index of every `.scm`/`.sld` in the worktree; this file wins, then everywhere else |
+| **`workspace/symbol`** | the same index — find a name you half-remember |
 
 Not there: rename, references, formatting, and scoped completion (a `let`
 binding is not offered — the same limit the REPL has). Go-to-definition
-stays inside the file, because a prelude name is a value and not a line.
+cannot reach a **prelude name or anything defined at the REPL**: it finds
+what a file says, and those are values rather than lines — hover is what
+tells you about them.
 
 ## Z5: the debugger
 
