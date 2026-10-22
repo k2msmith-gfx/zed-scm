@@ -52,12 +52,32 @@ Not Z4 — see its section for the measurement. Three candidates, best first:
 
 1. **Streaming output in scm.** Raised *by* the Z4 spike rather than
    planned: `:output` travels with the answer, so a form that prints and
-   then runs for two seconds sends nothing until it finishes. Fixing it
-   would improve the Z2 task pane, `scm-mode.el` and `ray-scm` together.
-   Argued in scm's `docs/repl.md` and `docs/plan.md` §13.3, **including why
-   to wait**: the socket half is a two-repo change to the door ray depends
-   on, and the modeler port is at 114 of 117. Do the embed-API sink half
-   first if it is wanted sooner.
+   then runs for two seconds sends nothing until it finishes. Argued in
+   scm's `docs/repl.md` and `docs/plan.md` §13.3, **including why to wait**:
+   the socket half is a two-repo change to the door ray depends on, and the
+   modeler port is at 114 of 117. Do the embed-API sink half first if it is
+   wanted sooner.
+
+   What it costs **here**, measured 2026-10-22 rather than guessed:
+
+   - **Z5's debugger is the real victim.** At a break the Debug Console
+     holds *nothing* of what the program printed — 0 output events by the
+     time the client is stopped — because the capture returns when the
+     evaluation ends and the handler runs inside it. The clue arrives after
+     the user has chosen between `,return` and abort. scm's `docs/dap.md`
+     records it as that adapter's worst flaw.
+   - **Z3 is untouched.** The language server only ever sends `complete`,
+     `describe` and `ping`; it never evaluates, so there is no output.
+   - **Z2 is mildly affected** — a short form is indistinguishable, a long
+     one sits silent and then dumps.
+
+   **And a trap for whoever lands streaming:** `bin/scm-eval` adds a
+   *second* layer of batching. Its `sed | awk` pipeline block-buffers when
+   its stdout is a pipe — measured: 0 bytes written while the producer was
+   still open, everything on close — so the task pane will not change until
+   that pipeline is unbuffered too (`sed -l` on macOS, `fflush()` in the
+   awk). Left alone for now because the upstream is batched anyway, and a
+   fix today would buy nothing.
 2. **Scoped completion.** Candidates are the global environment plus the
    file's top-level definitions, so a `let` binding is not offered. The
    same limit the REPL has, and fixing it in `scm-lsp` would need the
