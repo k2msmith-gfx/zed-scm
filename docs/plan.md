@@ -1,8 +1,8 @@
 # scm in Zed — the plan
 
-2026-10-21. What Zed can be made to do, what it cannot, and the staging.
-The feasibility question was asked and answered before any code: **most of
-the work is in scm, not in this repository.**
+2026-10-21, and current at 2026-10-22. What Zed can be made to do, what it
+cannot, and the staging. The feasibility question was asked and answered
+before any code: **most of the work is in scm, not in this repository.**
 
 ## What a Zed extension can provide
 
@@ -20,6 +20,57 @@ live in the extension, so it moves into scm — where the modeler's editor
 pane and ray's agent pane get it too, which is the better place for it
 anyway. `docs/repl.md` already says the terminal prompt is one client among
 several; this is another one.
+
+## Where this left off — 2026-10-22
+
+**The arc is complete as planned.** Z1, Z2, Z3 and Z5 are built, pushed and
+in use; Z4 was spiked and deferred on evidence. Nothing here is half-done,
+so the next session is picking a new thing rather than finishing an old one.
+
+| | built | lives in |
+|---|---|---|
+| Z1 | highlighting, brackets, indents, outline, text objects, `.scm` + `.sld` | this repo, queries only |
+| Z2 | a REPL terminal tab and eval of region / form / buffer, all one session | scm's **S22** (`scm --connect`) + `bin/scm-eval` and `examples/` here |
+| Z3 | completion, hover, signature help, diagnostics, outline, goto-definition | scm's **S23** (`scm-lsp`) + `[language_servers]` and ~40 lines here |
+| Z5 | a debugger: frames, locals, evaluate-in-frame, `,return` | scm's **S24** (`scm-dap`) + a schema, `[debug_adapters]` and three `dap_*` hooks here |
+
+**To run all of it from a clean machine:** install the dev extension
+(`zed: install dev extension` on this directory), `cargo install --path
+scm-lsp` and `cargo install --path scm-dap` in the scm repository, copy
+`examples/tasks.json` and `examples/keymap.json` into `~/.config/zed/`, then
+run the `scm: serve` task once. Port 7000 throughout.
+
+**What the whole arc proved, in one line:** a Zed extension cannot add a
+command, a keybinding, a panel, or answer a completion request — so the
+work goes in scm, and the extension only names programs to launch. Four
+stages later the extension is ~150 lines of Rust and scm gained three
+crates that any editor can use.
+
+### If you are choosing what is next
+
+Not Z4 — see its section for the measurement. Three candidates, best first:
+
+1. **Streaming output in scm.** Raised *by* the Z4 spike rather than
+   planned: `:output` travels with the answer, so a form that prints and
+   then runs for two seconds sends nothing until it finishes. Fixing it
+   would improve the Z2 task pane, `scm-mode.el` and `ray-scm` together.
+   Argued in scm's `docs/repl.md` and `docs/plan.md` §13.3, **including why
+   to wait**: the socket half is a two-repo change to the door ray depends
+   on, and the modeler port is at 114 of 117. Do the embed-API sink half
+   first if it is wanted sooner.
+2. **Scoped completion.** Candidates are the global environment plus the
+   file's top-level definitions, so a `let` binding is not offered. The
+   same limit the REPL has, and fixing it in `scm-lsp` would need the
+   token scan to track binding forms.
+3. **Multi-dialect highlighting.** The grammar ships
+   `dialects/{r5rs,r6rs,r7rs,chez,guile,chicken}`, so other Schemes are one
+   `languages/` directory each. A different product, not a tweak — this one
+   is deliberately scm-flavoured, which is its value over
+   `zed-extensions/scheme`.
+
+Known gap, unchanged: SRFI-4 literals do not parse, and `#f64(1.0 2.5)`
+fails **silently** as `#f` + `64` + a list. Allowlisted in
+`scripts/check.sh`. The fix belongs upstream.
 
 ## Stages
 
