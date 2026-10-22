@@ -1,0 +1,15 @@
+id = "scm"
+name = "scm Scheme"
+description = "Editing support for scm, an embeddable R7RS-small Scheme in Rust."
+version = "0.1.0"
+schema_version = 1
+authors = ["Kevin Smith <k2msmith@gmail.com>"]
+repository = "https://github.com/k2msmith-gfx/zed-scm"
+
+# The default parser of 6cdh/tree-sitter-scheme, which accepts the union of
+# R5RS, R6RS and R7RS reader syntax, `[]` lists and `#:` keywords. Pinned
+# past 0.25.0: that release renamed `syntax` to `syntax_quote` and split
+# `#;` out of `comment`, and the queries here use the new names.
+[grammars.scheme]
+repository = "https://github.com/6cdh/tree-sitter-scheme"
+commit = "45c72463ac4260ef6e07d1c0642ed43d4e9957b4"

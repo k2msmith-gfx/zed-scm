@@ -1,0 +1,20 @@
+name = "scm Scheme"
+grammar = "scheme"
+path_suffixes = ["scm"]
+line_comments = ["; ", ";; "]
+tab_size = 2
+hard_tabs = false
+autoclose_before = ")]"
+
+# `:` and `&` are word characters because `:at` and `&opt` are single tokens
+# in scm and a double-click should take the whole thing. The rest is the
+# R7RS identifier set minus the characters a delimiter already breaks on.
+word_characters = [
+    "-", "_", "!", "?", "*", "/", "+", "<", ">", "=", ":", "&", "%", "^", "~", "$", ".",
+]
+
+brackets = [
+    { start = "(", end = ")", close = true, newline = false },
+    { start = "[", end = "]", close = true, newline = false },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["comment", "string"] },
+]

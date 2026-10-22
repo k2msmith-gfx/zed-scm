@@ -1,0 +1,137 @@
+# scm in Zed — the plan
+
+2026-10-21. What Zed can be made to do, what it cannot, and the staging.
+The feasibility question was asked and answered before any code: **most of
+the work is in scm, not in this repository.**
+
+## What a Zed extension can provide
+
+Measured against the extension docs and `zed_extension_api` 0.7.0, an
+extension provides **languages and grammars, language servers, debug
+adapters, themes, icon themes, snippets and MCP servers**, and nothing
+else. The `Extension` trait has `language_server_command`,
+`label_for_completion`, `get_dap_binary`, `context_server_command` and the
+slash-command pair. There is **no API for a custom command, a keybinding,
+a panel, a buffer overlay, or "send this form to a process"**.
+
+That single fact decides the shape of everything below. `scm-mode.el` is
+528 lines of client-side protocol plumbing; in Zed that plumbing cannot
+live in the extension, so it moves into scm — where the modeler's editor
+pane and ray's agent pane get it too, which is the better place for it
+anyway. `docs/repl.md` already says the terminal prompt is one client among
+several; this is another one.
+
+## Stages
+
+| stage | what | where the work is | status |
+|---|---|---|---|
+| **Z1** | highlighting, brackets, indents, outline, text objects | this repo, queries only | **DONE** |
+| Z2 | `scm --connect ADDR` + Zed tasks: a REPL in a terminal window, and eval of region / buffer / top-level form sharing one session | scm (`scm-cli`), plus `tasks.json` here | next |
+| Z3 | `scm --lsp`: completion, hover, signature help, diagnostics, document symbols, goto-definition | scm (new `scm-lsp`), ~20 lines here | |
+| Z4 | a Jupyter kernel, for results inline in the buffer rather than in a terminal | a kernel crate or shim, nothing here | |
+| Z5 | a debug adapter over the break REPL: frames, locals, `,return` | scm, plus `debuggers` in `config.toml` | |
+
+### Z1 — highlighting (done)
+
+Queries only, no Rust. The decision that made it queries-only was measured
+rather than assumed: the grammar at the pinned commit parses `[a b c]` as a
+`list`, and both `:at` and `&opt` as plain `symbol`s, because `:` and `&`
+are legal R7RS identifier initials. So scm's additions need no grammar
+change — they need `#match?` on symbol text, which is what
+`languages/scm/highlights.scm` does. `scripts/check.sh` proves it on every
+`.scm` file in the scm repository.
+
+**Limitations, which are Zed's and not fixable here.** `indents.scm` can
+only say "this form indents its contents one level". There is no
+per-head indent amount, so a `let`'s bindings do not align under the
+opening paren the way `scheme-mode`'s `scheme-indent-function` aligns them,
+and a `cond` clause is indented like any other sub-form. Nothing in the
+extension API exposes an indent hook.
+
+### Z2 — a REPL window and eval, the cheap 80%
+
+Zed tasks expose `$ZED_SELECTED_TEXT`, `$ZED_FILE`, `$ZED_ROW` and
+`$ZED_COLUMN`, and `task::Spawn { task_name }` is bindable in
+`keymap.json`. A task with `use_new_terminal` runs the real terminal client
+in a terminal tab — history, completion, comma commands and the break REPL,
+free. So:
+
+- **the REPL window** is a task running `scm`;
+- **eval region / buffer** are tasks sending `:op eval` over the protocol.
+
+The catch is that the terminal client today owns its own in-process
+`Session`, so the window and the buffer evals would be two separate
+sessions and would not share state. The fix is in scm, not here:
+`scm --connect ADDR`, a terminal client of the protocol rather than of a
+local session. `scm-cli/src/main.rs` has `--serve` and no `--connect`.
+
+**`C-x C-e` — the sexp *before point* — does not survive the move.** The
+task variables give a row, a column and a selection, not a cursor-aware
+parse. What does survive, and is arguably better placed: pass `$ZED_FILE`
+and `$ZED_ROW` and let **scm** find the enclosing top-level form. It has a
+reader with locations; the editor does not need an AST.
+
+### Z3 — `scm --lsp`
+
+Completion in Zed means LSP, because the extension cannot answer a
+completion request itself — `language_server_command` returns an argv and
+everything after that is the protocol. The mapping onto `docs/repl.md` is
+close to mechanical:
+
+| LSP | op |
+|---|---|
+| `textDocument/completion` | `complete :prefix` |
+| `textDocument/hover`, `signatureHelp` | `describe` — kind, signature, doc, value |
+| `publishDiagnostics` | `parse` — `invalid` vs `incomplete` |
+| `documentSymbol`, `definition` | the reader's location table |
+
+That is `scm-describe-symbol` and `scm-eldoc-function` from the Emacs
+client, arriving as hover and signature help. It is an adapter over
+`Session`, not new semantics, and it is the stage with real size.
+
+### Z4 — a Jupyter kernel
+
+Zed's REPL runs any kernel it finds through Jupyter's kernelspec system, so
+this needs no extension at all: a `kernel.json` under
+`~/Library/Jupyter/kernels/scm/` and `repl: refresh kernelspecs`. The
+payoff over Z2 is that results land **inline in the buffer**, which is
+much closer to SLIME's overlays than a terminal is.
+
+The message set maps onto scm's ops almost one for one, including the one
+nobody expects: `is_complete_request` is exactly `parse`, the same
+question `RET` asks in the Emacs REPL and at the terminal prompt.
+`execute_request` is `eval`, `complete_request` is `complete`,
+`inspect_request` is `describe`.
+
+Two things to settle first. Zed matches a kernelspec's `language` to the
+editor's language name and scm is not among the documented kernels
+(Python, TypeScript, R, Julia, Scala), though a third-party OCaml kernel is
+reported working — so **spike the kernelspec before building the kernel**.
+And the wire protocol is ZeroMQ with HMAC-SHA256 signing, which scm's
+no-dependencies rule will not have in the library; a kernel is a separate
+crate, or a thin shim process, not a feature of `scm`.
+
+### Z5 — a debug adapter
+
+The break REPL (`live_frames`, `bindings_of`, `eval_in`, `,return`) maps
+onto DAP's `stackTrace`, `scopes`, `variables` and `evaluate` unusually
+well, and Zed supports debug-adapter extensions with a `debuggers` entry in
+`config.toml`. It would give frame inspection with a real UI, which the
+Emacs client does not have. Last, because Z2–Z4 may remove the appetite.
+
+## What Zed cannot be made to do
+
+A REPL **pane** of this package's own, with its own `RET`-completeness
+semantics, read-only prompt text and `M-p` history — `scm-mode.el`'s
+`*scm*` buffer. There is no UI API at any price. The terminal client in a
+terminal tab is the substitute, and it is a decent one.
+
+## Known grammar gaps
+
+SRFI-4 homogeneous vector literals. `#s8(-1 2)` is an `ERROR`;
+`#f64(1.0 2.5)` is worse, because it is **silent** — it reads as `#f`,
+then `64`, then a list, and will colour as a boolean with nothing looking
+wrong. Three test files in the scm repository; none of ray's 45 `.scm`
+files. Recorded in `scripts/check.sh`, which fails if a new file starts
+failing *and* if an allowlisted file starts passing, so the list cannot
+outlive the gap. The fix belongs upstream.
