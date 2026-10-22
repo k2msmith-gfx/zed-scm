@@ -30,10 +30,23 @@ usage() { sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 # line. The cost is that a *string* containing "scm> " loses it, which is
 # the right trade for a pane that otherwise shows `...  ...  scm>` and
 # nothing else.
+#
+# **One awk, and it flushes.** This was `sed | awk`, which block-buffers
+# when its stdout is a pipe -- measured at 0 bytes written while the
+# producer was still open. That made the pane silent until the form
+# finished no matter what the server did, so when scm learned to stream
+# (S25) nothing here would have changed. One process with an explicit
+# `fflush` is what lets a long form narrate itself.
 present() {
-    sed -e '/^scm [0-9][^ ]* on /d' -e '/ globals\. /d' \
-        -e 's/scm> //g' -e 's/\.\.\.  //g' \
-    | awk 'NF { print }'
+    awk '
+        /^scm [0-9][^ ]* on / { next }
+        / globals\. /          { next }
+        {
+            gsub(/scm> /, "")
+            gsub(/\.\.\.  /, "")
+            if (length($0) > 0) { print; fflush() }
+        }
+    '
 }
 
 # What a `define` bound, so a definition echoes its name instead of the
@@ -45,16 +58,23 @@ defined_name() {
 }
 
 # Send CODE; print the value, or the name it defined, or say it was quiet.
+#
+# **Passed through, not captured.** This used a command substitution to
+# decide whether anything had been printed -- which waits for the process
+# to exit and collects everything, so the pane stayed empty until the form
+# finished however well the server streamed. `tee` passes output on as it
+# arrives *and* leaves a copy to test for emptiness, which is the only part
+# that needed the whole answer.
 send() {
-    local code="$1" said
-    said=$(printf '%s\n' "$code" | "$SCM" --connect "$ADDR" 2>&1 | present)
-    if [ -n "$said" ]; then
-        printf '%s\n' "$said"
-    else
+    local code="$1" copy
+    copy=$(mktemp)
+    printf '%s\n' "$code" | "$SCM" --connect "$ADDR" 2>&1 | present | tee "$copy"
+    if [ ! -s "$copy" ]; then
         local name
         name=$(printf '%s\n' "$code" | defined_name)
         if [ -n "$name" ]; then printf '%s\n' "$name"; else printf '; no value\n'; fi
     fi
+    rm -f "$copy"
 }
 
 # The top-level form containing a line, found the way `beginning-of-defun`

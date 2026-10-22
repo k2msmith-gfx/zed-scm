@@ -55,6 +55,11 @@ is callable at the prompt a second later.
 | `C-c C-k` | `scm: eval buffer` | `(load FILE)`, so a backtrace names the file |
 | `C-c C-b` | `scm: interrupt` | stop a runaway, on a second connection so it arrives |
 
+Output **streams**: a form that prints and then keeps working narrates
+itself in the pane rather than going quiet and then dumping everything
+(scm's S25). The same is true at a debugger break, which is where it
+matters most.
+
 Copy [examples/tasks.json](examples/tasks.json) into
 `~/.config/zed/tasks.json` and [examples/keymap.json](examples/keymap.json)
 into `~/.config/zed/keymap.json`, adjusting the path to `bin/scm-eval` and

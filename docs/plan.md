@@ -50,34 +50,30 @@ crates that any editor can use.
 
 Not Z4 — see its section for the measurement. Three candidates, best first:
 
-1. **Streaming output in scm.** Raised *by* the Z4 spike rather than
-   planned: `:output` travels with the answer, so a form that prints and
-   then runs for two seconds sends nothing until it finishes. Argued in
-   scm's `docs/repl.md` and `docs/plan.md` §13.3, **including why to wait**:
-   the socket half is a two-repo change to the door ray depends on, and the
-   modeler port is at 114 of 117. Do the embed-API sink half first if it is
-   wanted sooner.
+1. ~~**Streaming output in scm.**~~ **DONE — scm's S25, 2026-10-22.**
+   Greenlit once the modeler port was largely complete, which was the one
+   thing it was waiting on. `:output` used to travel only with the answer;
+   the first chunk now leaves at **+0.00 s**, and the answer still carries
+   the whole of it, so nothing that read `:output` changed. Opt-in per
+   connection (`(:op stream :on #t)`), because `scm-mode.el` dispatches by
+   `:id` and removes the callback when it fires — the Emacs gate passes
+   unchanged.
 
-   What it costs **here**, measured 2026-10-22 rather than guessed:
+   What it changed **here**:
 
-   - **Z5's debugger is the real victim.** At a break the Debug Console
-     holds *nothing* of what the program printed — 0 output events by the
-     time the client is stopped — because the capture returns when the
-     evaluation ends and the handler runs inside it. The clue arrives after
-     the user has chosen between `,return` and abort. scm's `docs/dap.md`
-     records it as that adapter's worst flaw.
-   - **Z3 is untouched.** The language server only ever sends `complete`,
-     `describe` and `ping`; it never evaluates, so there is no output.
-   - **Z2 is mildly affected** — a short form is indistinguishable, a long
-     one sits silent and then dumps.
+   - **Z5's debugger has the program's narration at the break.** This was
+     the strongest argument for the stage: the console used to be empty at
+     exactly the moment you choose between `,return` and abort.
+   - **The Z2 task pane narrates.** Verified end to end — `STARTED`
+     visible one second into a three-second form, then `DONE` and the
+     value. That needed two fixes on this side as well as the server:
+     `bin/scm-eval` captured through a command substitution, which waits
+     for the process to exit, and its `sed | awk` pipeline block-buffered.
+     It is now one `awk` with an explicit `fflush`, passing output through
+     with `tee` rather than capturing it.
+   - **Z3 is still untouched**, as predicted: the language server never
+     evaluates.
 
-   **And a trap for whoever lands streaming:** `bin/scm-eval` adds a
-   *second* layer of batching. Its `sed | awk` pipeline block-buffers when
-   its stdout is a pipe — measured: 0 bytes written while the producer was
-   still open, everything on close — so the task pane will not change until
-   that pipeline is unbuffered too (`sed -l` on macOS, `fflush()` in the
-   awk). Left alone for now because the upstream is batched anyway, and a
-   fix today would buy nothing.
 2. **Scoped completion.** Candidates are the global environment plus the
    file's top-level definitions, so a `let` binding is not offered. The
    same limit the REPL has, and fixing it in `scm-lsp` would need the
